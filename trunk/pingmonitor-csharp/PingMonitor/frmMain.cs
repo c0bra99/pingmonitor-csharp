@@ -177,7 +177,7 @@ namespace PingMonitor
             {
                 lblWaiting.Visible = true;
                 Application.DoEvents();
-                Thread.Sleep(50);
+                Thread.Sleep(1);
             }
             lblWaiting.Visible = false;
             
@@ -204,21 +204,46 @@ namespace PingMonitor
         /// When the export button is clicked, it will export to
         /// a CSV File.
         /// </summary>
-        /// 
-        /// <remarks>
-        /// TODO: Use a filedialog to pick where to save the file to.
-        /// </remarks>
         private void btnExport_Click(object sender, EventArgs e)
         {
-            using (StreamWriter writer = new StreamWriter("output.csv"))
-            {
-                foreach (PingReplyLogEntry entry in _pingReplyLog)
-                {
-                    writer.WriteLine(entry.GetCSVLine());
-                }
-            }
+            SaveFileDialog fileDialog = new SaveFileDialog();
+            fileDialog.CheckFileExists = false;
+            fileDialog.OverwritePrompt = false;
+            fileDialog.DefaultExt = ".csv";
+            fileDialog.FileName = "output.csv";
+            fileDialog.Filter = "Comma Seperated Value files (*.csv)|*.csv|All files (*.*)|*.*";
 
-            MessageBox.Show("Exported!");
+            DialogResult fileSelectResult = fileDialog.ShowDialog();
+            if (fileSelectResult == DialogResult.OK)
+            {
+                bool appendFile = true;
+
+                if (File.Exists(fileDialog.FileName))
+                {
+                    DialogResult appendFileResult = MessageBox.Show("File already exists!\r\nWould you like to append to the existing file instead of overwriting?",
+                                                    "File already exists!", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning);
+                    if (appendFileResult == DialogResult.No)
+                    {
+                        appendFile = false;
+                    }
+                    else if (appendFileResult == DialogResult.Cancel)
+                    {
+                        //if they cancel, just return and get out of here
+                        return;
+                    }
+                }
+
+                using (StreamWriter writer = new StreamWriter(fileDialog.FileName, appendFile))
+                {
+                    foreach (PingReplyLogEntry entry in _pingReplyLog)
+                    {
+                        writer.WriteLine(entry.GetCSVLine());
+                    }
+                }
+
+                MessageBox.Show("Export complete!", "Finished");
+            }
         }
+
     }
 }
