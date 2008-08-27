@@ -23,18 +23,51 @@ using System.Windows.Forms;
 using System.Net.NetworkInformation;
 using System.Threading;
 using System.IO;
+using System.ComponentModel;
 
 namespace PingMonitor
 {
     public partial class frmMain : Form
     {
-        private List<PingReplyLogEntry> _pingReplyLog = new List<PingReplyLogEntry>();
         private bool _packetOut = false;
+        AutoResetEvent waiter;
+        Ping pingSender;
+        PingOptions options;
+        byte[] buffer;
+        //Wait 12 seconds for a reply.
+        int timeout = 12000;
 
+        BindingSource bindingSource;
+        BindingList<PingReplyLogEntry> _pingReplyLog;
+        /// <summary>
+        /// The form's constructor
+        /// </summary>
         public frmMain()
         {
             InitializeComponent();
+
+            //Create a buffer of 32 bytes of data to be transmitted.
+            string data = "abcdefghijklmnopqrstuvwxyzabcdef";
+            buffer = Encoding.ASCII.GetBytes(data);
+
+            //The data can go through 64 gateways or routers
+            //before it is destroyed, and the data packet cannot be fragmented.
+            options = new PingOptions(64, true);
+            pingSender = new Ping();
+            waiter = new AutoResetEvent(false);
+
+            //When the PingCompleted event is raised the PingCompletedCallback method is called.
+            pingSender.PingCompleted += new PingCompletedEventHandler(PingCompletedCallback);
+            bindingSource = new BindingSource();
+            bindingSource.AllowNew = false;
+            bindingSource.DataSource = _pingReplyLog;
+
+            _pingReplyLog = new BindingList<PingReplyLogEntry>();
+            bindingSource.DataSource = _pingReplyLog;
+
+            dgvGrid.DataSource = bindingSource;
         }
+
 
         /// <summary>
         /// This will send an asynchronous ping to the host passed in
@@ -50,30 +83,10 @@ namespace PingMonitor
         {
             if (host.Length == 0)
             {
-                throw new ArgumentException("Ping needs a host or IP Address.");
+                MessageBox.Show("Please enter a host or IP address!", "Missing Host/Address", MessageBoxButtons.OK, MessageBoxIcon.Stop);
+                return;
             }
             _packetOut = true;
-
-            AutoResetEvent waiter = new AutoResetEvent(false);
-
-            Ping pingSender = new Ping();
-
-            //When the PingCompleted event is raised,
-            //the PingCompletedCallback method is called.
-            pingSender.PingCompleted += new PingCompletedEventHandler(PingCompletedCallback);
-
-            //Create a buffer of 32 bytes of data to be transmitted.
-            string data = "abcdefghijklmnopqrstuvwxyzabcdef";
-            byte[] buffer = Encoding.ASCII.GetBytes(data);
-
-            //Wait 12 seconds for a reply.
-            int timeout = 12000;
-
-            //Set options for transmission:
-            //The data can go through 64 gateways or routers
-            //before it is destroyed, and the data packet
-            //cannot be fragmented.
-            PingOptions options = new PingOptions(64, true);
 
             //Send the ping asynchronously.
             //Use the waiter as the user token.
@@ -86,7 +99,7 @@ namespace PingMonitor
         {
             _packetOut = false;
 
-            //If the operation was canceled, display a message to the user.
+            //If the operation was cancelled, display a message to the user.
             if (e.Cancelled)
             {
                 //Let the main thread resume. 
@@ -141,13 +154,14 @@ namespace PingMonitor
             }
             else
             {
-                _pingReplyLog.Add(new PingReplyLogEntry(DateTime.Now, reply));
+                bindingSource.SuspendBinding();
 
-                dgvGrid.DataSource = _pingReplyLog;
-                dgvGrid.SuspendLayout();
-                dgvGrid.DataSource = null;
-                dgvGrid.DataSource = _pingReplyLog;
-                dgvGrid.ResumeLayout();
+                _pingReplyLog.Add(new PingReplyLogEntry(DateTime.Now, reply));
+                
+                bindingSource.ResumeBinding();
+
+                //scroll to the end of the grid
+                dgvGrid.FirstDisplayedScrollingRowIndex = dgvGrid.Rows.Count - 1;
             }
         }
 
@@ -161,6 +175,7 @@ namespace PingMonitor
             btnStart.Enabled = false;
             btnStop.Enabled = true;
             tmrPingTimer.Interval = (int)nudInterval.Value;
+         
             tmrPingTimer.Start();
         }
 
@@ -177,14 +192,14 @@ namespace PingMonitor
             {
                 lblWaiting.Visible = true;
                 Application.DoEvents();
-                Thread.Sleep(1);
+                //Thread.Sleep(10);
             }
             lblWaiting.Visible = false;
             
             ping(txtAddress.Text);
 
             tmrPingTimer.Interval = (int)nudInterval.Value;
-            tmrPingTimer.Enabled = true;
+            tmrPingTimer.Enabled = btnStop.Enabled; //if stop button still enabled, keep going
         }
 
 
