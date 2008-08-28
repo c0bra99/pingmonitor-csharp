@@ -7,3 +7,7 @@ Problems/Bugs:
 
 
 New Features:
+Allow user to enter the options we are setting as default such as timeout, fragment, ttl, data size/data.
+Option to show only the most recent entries in the grid (but keep the old entries available to write to file).
+Move to a better interface that will allow the above features to be done nicely.
+Allow user to choose file export format.
