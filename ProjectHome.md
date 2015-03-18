@@ -1,0 +1,1 @@
+This is useful for monitoring a hosts connectivity. It is good for troubleshooting networking hardware and connection problems alike.
